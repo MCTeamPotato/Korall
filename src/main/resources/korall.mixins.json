@@ -1,0 +1,20 @@
+{
+  "required": true,
+  "package": "me.kall.korall.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "overwrites": {
+    "conformVisibility": false
+  },
+  "minVersion": "0.8",
+  "client": [
+  ],
+  "mixins": [
+    "BlockMixin",
+    "EntityMixin",
+    "EntityTypeMixin",
+    "ServerLevelMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
