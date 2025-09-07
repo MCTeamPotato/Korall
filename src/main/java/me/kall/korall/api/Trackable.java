@@ -39,7 +39,7 @@ public interface Trackable {
         BlockTracker.TRACKED_BLOCKS.put(block, acceptWorldGen);
     }
 
-    static LongSet getBlocks(ServerLevel level, ChunkPos chunkPos, ResourceLocation blockId) {
+    static LongSet getTrackedBlocks(ServerLevel level, ChunkPos chunkPos, ResourceLocation blockId) {
         var chunkMap = BlockTracker.get(level).blockStorage.get(level.dimension().location());
         if (chunkMap == null) return LongSets.emptySet();
         var blockMap = chunkMap.get(chunkPos.toLong());

@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import me.kall.korall.Korall;
+import me.kall.korall.api.Registry;
 import me.kall.korall.api.Trackable;
 import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.core.BlockPos;
@@ -18,6 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -220,6 +222,27 @@ public class BlockTracker extends SavedData {
             }
         } catch (Exception e) {
             Korall.LOGGER.error("Failed to remove block {} at {} in dimension {}", blockId, pos, level.dimension().location(), e);
+        }
+    }
+
+    public static void track(BlockPos pos, @NotNull BlockState oldState, @NotNull BlockState newState, ServerLevel level) {
+        Block oldBlock = oldState.getBlock();
+        Block newBlock = newState.getBlock();
+
+        boolean isWorldGen = !level.getServer().isSameThread();
+
+        if (Trackable.isTracked(oldBlock)) {
+            boolean acceptWorldGen = Trackable.acceptWorldGen(oldBlock);
+            if (acceptWorldGen || !isWorldGen) {
+                level.getServer().execute(() -> BlockTracker.get(level).removeBlock(level, pos, Registry.getRegistryName(oldBlock)));
+            }
+        }
+
+        if (Trackable.isTracked(newBlock)) {
+            boolean acceptWorldGen = Trackable.acceptWorldGen(newBlock);
+            if (acceptWorldGen || !isWorldGen) {
+                level.getServer().execute(() -> BlockTracker.get(level).addBlock(level, pos, Registry.getRegistryName(newBlock)));
+            }
         }
     }
 }
