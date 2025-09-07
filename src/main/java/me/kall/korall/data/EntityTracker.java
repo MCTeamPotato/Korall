@@ -78,7 +78,7 @@ public class EntityTracker {
         }
     }
 
-    private static void onTick(TickEvent.ServerTickEvent event) {
+    private static void onTick(TickEvent.@NotNull ServerTickEvent event) {
         if (event.phase.equals(TickEvent.Phase.START)) {
             event.getServer().execute(() -> {
                 Runnable task;

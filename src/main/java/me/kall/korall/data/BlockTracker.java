@@ -1,9 +1,11 @@
 package me.kall.korall.data;
 
 import it.unimi.dsi.fastutil.longs.*;
-import it.unimi.dsi.fastutil.objects.*;
+import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
+import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import me.kall.korall.Korall;
-import me.kall.korall.api.Registry;
 import me.kall.korall.api.Trackable;
 import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.core.BlockPos;
@@ -18,16 +20,15 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.ForgeRegistries;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.ArrayList;
-import java.util.List;
 
+@ApiStatus.Internal
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class BlockTracker extends SavedData {
@@ -35,159 +36,190 @@ public class BlockTracker extends SavedData {
 
     public static final Object2BooleanMap<ResourceLocation> TRACKED_BLOCKS = new Object2BooleanOpenHashMap<>();
 
-    public final Object2ObjectMap<ResourceLocation, Object2ObjectMap<ResourceLocation, Long2ObjectMap<LongSet>>> blockStorage = new Object2ObjectOpenHashMap<>();
-
-    public static void trackBlock(Block block) {
-        TRACKED_BLOCKS.put(Registry.getRegistryName(block), true);
-    }
-
-    public static void trackBlock(ResourceLocation block) {
-        TRACKED_BLOCKS.put(block, true);
-    }
-
-    public static void trackBlock(Block block, boolean acceptWorldGen) {
-        TRACKED_BLOCKS.put(Registry.getRegistryName(block), acceptWorldGen);
-    }
-
-    public static void trackBlock(ResourceLocation block, boolean acceptWorldGen) {
-        TRACKED_BLOCKS.put(block, acceptWorldGen);
-    }
+    public final Object2ObjectMap<ResourceLocation, Long2ObjectMap<Object2ObjectMap<ResourceLocation, LongSet>>> blockStorage = new Object2ObjectOpenHashMap<>();
 
     public static void register() {
         IEventBus bus = MinecraftForge.EVENT_BUS;
         bus.addListener(BlockTracker::initTracker);
-        bus.addListener(BlockTracker::cleanData);
     }
 
     private static void initTracker(@NotNull ServerStartingEvent event) {
         event.getServer().execute(() -> {
-            for (Object2BooleanMap.Entry<ResourceLocation> entry : BlockTracker.TRACKED_BLOCKS.object2BooleanEntrySet()) {
+            for (var entry : BlockTracker.TRACKED_BLOCKS.object2BooleanEntrySet()) {
                 ResourceLocation blockId = entry.getKey();
                 boolean worldGen = entry.getBooleanValue();
                 Block block = ForgeRegistries.BLOCKS.getValue(blockId);
                 if (block instanceof Trackable trackable) {
                     trackable.trackable$setTracked(true);
                     trackable.worldGen$setAccepted(worldGen);
+                    Korall.LOGGER.debug("Successfully registered tracked block: {}", blockId);
+                } else {
+                    Korall.LOGGER.warn("Failed to register tracked block: {} - Block not found", blockId);
                 }
-            }
-        });
-    }
-
-    private static void cleanData(@NotNull ServerStartedEvent event) {
-        event.getServer().execute(() -> {
-            for (ServerLevel level : event.getServer().getAllLevels()) {
-                List<ResourceLocation> toRemove = new ArrayList<>();
-                BlockTracker data = BlockTracker.get(level);
-                for (ResourceLocation id : data.blockStorage.keySet()) {
-                    if (Trackable.isTracked(ForgeRegistries.BLOCKS.getValue(id))) continue;
-                    toRemove.add(id);
-                }
-                toRemove.forEach(data.blockStorage::remove);
-                if (toRemove.isEmpty()) continue;
-                Korall.LOGGER.info("[Korall] Out-dated tracked blocks in `{}` are cleaned: {}", level.dimension().location(), toRemove.toArray());
             }
         });
     }
 
     public static BlockTracker load(CompoundTag nbt) {
         BlockTracker data = new BlockTracker();
-        for (String registryIdStr : nbt.getAllKeys()) {
-            CompoundTag registryTag = nbt.getCompound(registryIdStr);
-            ResourceLocation registryId = ResourceLocation.tryParse(registryIdStr);
-            if (registryId == null) continue;
+        Korall.LOGGER.info("Loading tracked block data...");
 
-            Object2ObjectMap<ResourceLocation, Long2ObjectMap<LongSet>> dimMap = new Object2ObjectOpenHashMap<>();
-
-            for (String dimKey : registryTag.getAllKeys()) {
-                CompoundTag dimTag = registryTag.getCompound(dimKey);
-                ResourceLocation dimID = ResourceLocation.tryParse(dimKey);
-                if (dimID == null) continue;
-
-                Long2ObjectMap<LongSet> chunkMap = new Long2ObjectOpenHashMap<>();
-
-                for (String chunkKeyStr : dimTag.getAllKeys()) {
-                    long chunkKey = Long.parseLong(chunkKeyStr);
-                    ListTag posList = dimTag.getList(chunkKeyStr, Tag.TAG_LONG);
-
-                    LongSet posSet = new LongOpenHashSet();
-                    for (Tag tag : posList) {
-                        posSet.add(((LongTag) tag).getAsLong());
-                    }
-
-                    chunkMap.put(chunkKey, posSet);
-                }
-
-                dimMap.put(dimID, chunkMap);
+        for (String dimKey : nbt.getAllKeys()) {
+            ResourceLocation dimID = ResourceLocation.tryParse(dimKey);
+            if (dimID == null) {
+                Korall.LOGGER.warn("Skipping invalid dimension key in NBT: {}", dimKey);
+                continue;
             }
 
-            data.blockStorage.put(registryId, dimMap);
+            CompoundTag dimTag = nbt.getCompound(dimKey);
+            var chunkMap = new Long2ObjectOpenHashMap<Object2ObjectMap<ResourceLocation, LongSet>>();
+
+            for (String chunkKeyStr : dimTag.getAllKeys()) {
+                long chunkKey;
+                try {
+                    chunkKey = Long.parseLong(chunkKeyStr);
+                } catch (NumberFormatException e) {
+                    Korall.LOGGER.warn("Skipping invalid chunk key in dimension {}: {}", dimID, chunkKeyStr, e);
+                    continue;
+                }
+
+                CompoundTag chunkTag = dimTag.getCompound(chunkKeyStr);
+                var blockMap = new Object2ObjectOpenHashMap<ResourceLocation, LongSet>();
+
+                for (String blockKey : chunkTag.getAllKeys()) {
+                    ResourceLocation blockId = ResourceLocation.tryParse(blockKey);
+                    if (blockId == null) {
+                        Korall.LOGGER.warn("Skipping invalid block key in chunk {}: {}", chunkKeyStr, blockKey);
+                        continue;
+                    }
+
+                    ListTag posList = chunkTag.getList(blockKey, Tag.TAG_LONG);
+                    LongSet posSet = new LongOpenHashSet();
+                    for (Tag tag : posList) {
+                        if (tag instanceof LongTag longTag) {
+                            posSet.add(longTag.getAsLong());
+                        } else {
+                            Korall.LOGGER.warn("Skipping invalid position tag in block {}: expected LONG, got {}", blockId, tag.getId());
+                        }
+                    }
+                    blockMap.put(blockId, posSet);
+                }
+
+                chunkMap.put(chunkKey, blockMap);
+            }
+
+            data.blockStorage.put(dimID, chunkMap);
+            Korall.LOGGER.debug("Loaded {} chunks for dimension {}", chunkMap.size(), dimID);
         }
-        Korall.LOGGER.debug("TrackedBlockData loaded: {}", data.blockStorage);
+
+        Korall.LOGGER.info("TrackedBlockData loaded successfully with {} dimensions", data.blockStorage.size());
         return data;
     }
 
     @Override
     public CompoundTag save(CompoundTag nbt) {
-        for (Object2ObjectMap.Entry<ResourceLocation, Object2ObjectMap<ResourceLocation, Long2ObjectMap<LongSet>>> registryEntry : blockStorage.object2ObjectEntrySet()) {
-            CompoundTag blockTag = new CompoundTag();
-            for (Object2ObjectMap.Entry<ResourceLocation, Long2ObjectMap<LongSet>> dimEntry : registryEntry.getValue().object2ObjectEntrySet()) {
-                CompoundTag dimTag = new CompoundTag();
-                for (Long2ObjectMap.Entry<LongSet> chunkEntry : dimEntry.getValue().long2ObjectEntrySet()) {
+        Korall.LOGGER.info("Saving tracked block data...");
+        int totalDimensions = 0;
+        int totalChunks = 0;
+        int totalBlocks = 0;
+
+        for (var dimEntry : blockStorage.object2ObjectEntrySet()) {
+            CompoundTag dimTag = new CompoundTag();
+            int dimensionChunks = 0;
+            int dimensionBlocks = 0;
+
+            for (var chunkEntry : dimEntry.getValue().long2ObjectEntrySet()) {
+                CompoundTag chunkTag = new CompoundTag();
+                int chunkBlocks = 0;
+
+                for (var blockEntry : chunkEntry.getValue().object2ObjectEntrySet()) {
                     ListTag posList = new ListTag();
-                    for (long posLong : chunkEntry.getValue()) {
+                    for (long posLong : blockEntry.getValue()) {
                         posList.add(LongTag.valueOf(posLong));
                     }
-                    dimTag.put(Long.toString(chunkEntry.getLongKey()), posList);
+                    chunkTag.put(blockEntry.getKey().toString(), posList);
+                    chunkBlocks++;
                 }
 
-                blockTag.put(dimEntry.getKey().toString(), dimTag);
+                dimTag.put(Long.toString(chunkEntry.getLongKey()), chunkTag);
+                dimensionChunks++;
+                dimensionBlocks += chunkBlocks;
             }
-            nbt.put(registryEntry.getKey().toString(), blockTag);
+
+            nbt.put(dimEntry.getKey().toString(), dimTag);
+            totalDimensions++;
+            totalChunks += dimensionChunks;
+            totalBlocks += dimensionBlocks;
+
+            Korall.LOGGER.debug("Saved dimension {}: {} chunks, {} blocks", dimEntry.getKey(), dimensionChunks, dimensionBlocks);
         }
-        Korall.LOGGER.debug("TrackedBlockData saved: {}", blockStorage);
+
+        Korall.LOGGER.info("TrackedBlockData saved: {} dimensions, {} chunks, {} blocks", totalDimensions, totalChunks, totalBlocks);
         return nbt;
     }
 
     public static BlockTracker get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(BlockTracker::load, BlockTracker::new, DATA_NAME);
-    }
-
-    public void addBlock(ServerLevel level, BlockPos pos, ResourceLocation registryId) {
-        ResourceLocation dim = level.dimension().location();
-        long chunkKey = ChunkPos.asLong(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
-        if (blockStorage.computeIfAbsent(registryId, k -> new Object2ObjectOpenHashMap<>()).computeIfAbsent(dim, k -> new Long2ObjectOpenHashMap<>()).computeIfAbsent(chunkKey, k -> new LongOpenHashSet()).add(pos.asLong())) {
-            setDirty();
+        try {
+            return level.getDataStorage().computeIfAbsent(BlockTracker::load, BlockTracker::new, DATA_NAME);
+        } catch (Exception e) {
+            Korall.LOGGER.error("Failed to get BlockTracker for level {}", level.dimension().location(), e);
+            return new BlockTracker();
         }
     }
 
-    public void removeBlock(ServerLevel level, BlockPos pos, ResourceLocation registryId) {
-        ResourceLocation dim = level.dimension().location();
-        Object2ObjectMap<ResourceLocation, Long2ObjectMap<LongSet>> dimMap = blockStorage.get(registryId);
-        if (dimMap == null) return;
+    public void addBlock(ServerLevel level, BlockPos pos, ResourceLocation blockId) {
+        try {
+            ResourceLocation dim = level.dimension().location();
+            long chunkKey = ChunkPos.asLong(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
 
-        Long2ObjectMap<LongSet> chunkMap = dimMap.get(dim);
-        if (chunkMap == null) return;
+            if (blockStorage.computeIfAbsent(dim, k -> new Long2ObjectOpenHashMap<>()).computeIfAbsent(chunkKey, k -> new Object2ObjectOpenHashMap<>()).computeIfAbsent(blockId, k -> new LongOpenHashSet()).add(pos.asLong())) {
+                setDirty();
+                Korall.LOGGER.debug("Added block {} at {} in dimension {}", blockId, pos, dim);
+            }
+        } catch (Exception e) {
+            Korall.LOGGER.error("Failed to add block {} at {} in dimension {}", blockId, pos, level.dimension().location(), e);
+        }
+    }
 
-        long chunkKey = ChunkPos.asLong(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+    public void removeBlock(ServerLevel level, BlockPos pos, ResourceLocation blockId) {
+        try {
+            ResourceLocation dim = level.dimension().location();
+            var chunkMap = blockStorage.get(dim);
+            if (chunkMap == null) {
+                Korall.LOGGER.debug("Attempted to remove block from non-existent dimension: {}", dim);
+                return;
+            }
 
-        LongSet posSet = chunkMap.get(chunkKey);
-        if (posSet == null) return;
+            long chunkKey = ChunkPos.asLong(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+            var blockMap = chunkMap.get(chunkKey);
+            if (blockMap == null) {
+                Korall.LOGGER.debug("Attempted to remove block from non-existent chunk: {} in dimension {}", chunkKey, dim);
+                return;
+            }
 
-        if (posSet.remove(pos.asLong())) {
-            if (posSet.isEmpty()) {
-                chunkMap.remove(chunkKey);
-                if (chunkMap.isEmpty()) {
-                    dimMap.remove(dim);
-                    if (dimMap.isEmpty()) {
-                        blockStorage.remove(registryId);
+            LongSet posSet = blockMap.get(blockId);
+            if (posSet == null) {
+                Korall.LOGGER.debug("Attempted to remove non-existent block: {} in chunk {} dimension {}", blockId, chunkKey, dim);
+                return;
+            }
+
+            if (posSet.remove(pos.asLong())) {
+                setDirty();
+                Korall.LOGGER.debug("Removed block {} at {} in dimension {}", blockId, pos, dim);
+
+                if (posSet.isEmpty()) {
+                    blockMap.remove(blockId);
+                    if (blockMap.isEmpty()) {
+                        chunkMap.remove(chunkKey);
+                        if (chunkMap.isEmpty()) {
+                            blockStorage.remove(dim);
+                            Korall.LOGGER.debug("Removed empty dimension: {}", dim);
+                        }
                     }
                 }
             }
-            setDirty();
+        } catch (Exception e) {
+            Korall.LOGGER.error("Failed to remove block {} at {} in dimension {}", blockId, pos, level.dimension().location(), e);
         }
-    }
-
-    public LongSet getBlocks(ServerLevel level, ChunkPos chunkPos, ResourceLocation blockId) {
-        return LongSets.unmodifiable(blockStorage.getOrDefault(blockId, Object2ObjectMaps.emptyMap()).getOrDefault(level.dimension().location(), Long2ObjectMaps.emptyMap()).getOrDefault(chunkPos.toLong(), LongSets.emptySet()));
     }
 }

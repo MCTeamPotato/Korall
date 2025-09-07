@@ -119,6 +119,8 @@ dependencies {
     if (embeddiumIntegration) modImplementation("curse.maven:embeddium-908741:${embeddium}")
     if (useProvider) modImplementation("curse.maven:registrynameprovider-1321150:${provider}")
     if (useJsonate) modImplementation("curse.maven:jsonate-1325790:${jsonate}")
+
+    shadow(implementation("org.openjdk.jol:jol-core:0.17"))
 }
 
 processResources {
