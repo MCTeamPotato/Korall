@@ -1,6 +1,7 @@
 {
   "required": true,
   "package": "me.kall.korall.mixin",
+  "plugin": "me.kall.korall.mixin.MixinConfigPlugin",
   "compatibilityLevel": "JAVA_8",
   "overwrites": {
     "conformVisibility": false
@@ -10,8 +11,10 @@
   ],
   "mixins": [
     "BlockMixin",
+    "EnchantedBookItemMixin",
     "EntityMixin",
     "EntityTypeMixin",
+    "ItemStackMixin",
     "ServerLevelMixin"
   ],
   "injectors": {

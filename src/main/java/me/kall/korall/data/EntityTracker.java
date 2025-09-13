@@ -16,6 +16,7 @@ import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 
 import java.util.Collections;
 import java.util.Queue;
@@ -27,7 +28,7 @@ public class EntityTracker {
     public static final Object2ObjectMap<ResourceLocation, Long2ObjectMap<Set<UUID>>> ENTITIES = new Object2ObjectOpenHashMap<>();
     public static final Queue<Runnable> TASKS = new ConcurrentLinkedQueue<>();
 
-    public Set<UUID> getEntities(@NotNull ServerLevel level, @NotNull ChunkPos chunkPos) {
+    public static @NotNull @UnmodifiableView Set<UUID> getEntities(@NotNull ServerLevel level, @NotNull ChunkPos chunkPos) {
         return Collections.unmodifiableSet(ENTITIES.getOrDefault(level.dimension().location(), Long2ObjectMaps.emptyMap()).getOrDefault(chunkPos.toLong(), Collections.emptySet()));
     }
 
