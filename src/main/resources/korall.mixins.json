@@ -11,7 +11,6 @@
   ],
   "mixins": [
     "impl.BlockMixin",
-    "impl.EnchantedBookItemMixin",
     "impl.EntityMixin",
     "impl.EntityTypeMixin",
     "impl.ItemStackMixin",

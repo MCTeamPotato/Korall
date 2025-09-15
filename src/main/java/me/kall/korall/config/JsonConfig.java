@@ -2,7 +2,7 @@ package me.kall.korall.config;
 
 import com.google.gson.*;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import net.minecraftforge.fml.loading.FMLLoader;
+import net.neoforged.fml.loading.FMLLoader;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 

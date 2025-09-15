@@ -1,18 +1,18 @@
 package me.kall.korall.event;
 
+import net.minecraft.core.Holder;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.eventbus.api.Cancelable;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.ICancellableEvent;
 
-@Cancelable
-public class ItemEnchantEvent extends Event {
+public class ItemEnchantEvent extends Event implements ICancellableEvent {
     private final ItemStack itemStack;
-    private Enchantment enchantment;
+    private Holder<Enchantment> enchantment;
     private int level;
     private final boolean isEnchantedBook;
 
-    public ItemEnchantEvent(ItemStack itemStack, Enchantment enchantment, int level, boolean isEnchantedBook) {
+    public ItemEnchantEvent(ItemStack itemStack, Holder<Enchantment> enchantment, int level, boolean isEnchantedBook) {
         this.itemStack = itemStack;
         this.enchantment = enchantment;
         this.level = level;
@@ -23,7 +23,7 @@ public class ItemEnchantEvent extends Event {
         return this.isEnchantedBook;
     }
 
-    public Enchantment getEnchantment() {
+    public Holder<Enchantment> getEnchantment() {
         return this.enchantment;
     }
 
@@ -35,7 +35,7 @@ public class ItemEnchantEvent extends Event {
         return this.itemStack;
     }
 
-    public void setEnchantment(Enchantment enchantment) {
+    public void setEnchantment(Holder<Enchantment> enchantment) {
         this.enchantment = enchantment;
     }
 

@@ -11,21 +11,23 @@ import me.kall.korall.api.Trackable;
 import me.kall.korall.event.BlockChangeEvent;
 import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.LongTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
@@ -44,7 +46,7 @@ public class BlockTracker extends SavedData {
     public final Object2ObjectMap<ResourceLocation, Long2ObjectMap<Object2ObjectMap<ResourceLocation, LongSet>>> blockStorage = new Object2ObjectOpenHashMap<>();
 
     public static void register() {
-        IEventBus bus = MinecraftForge.EVENT_BUS;
+        IEventBus bus = NeoForge.EVENT_BUS;
         bus.addListener(BlockTracker::initTracker);
         bus.addListener(BlockTracker::cleanData);
         bus.addListener(BlockTracker::blockChange);
@@ -55,7 +57,7 @@ public class BlockTracker extends SavedData {
             for (var entry : BlockTracker.TRACKED_BLOCKS.object2BooleanEntrySet()) {
                 ResourceLocation blockId = entry.getKey();
                 boolean worldGen = entry.getBooleanValue();
-                Block block = ForgeRegistries.BLOCKS.getValue(blockId);
+                Block block = BuiltInRegistries.BLOCK.get(blockId);
                 if (block instanceof Trackable trackable) {
                     trackable.trackable$setTracked(true);
                     trackable.worldGen$setAccepted(worldGen);
@@ -77,7 +79,7 @@ public class BlockTracker extends SavedData {
                 if (dimMap == null) continue;
                 dimMap.forEach((chunkKey, blockMap) -> {
                     for (ResourceLocation id : blockMap.keySet()) {
-                        if (!Trackable.isTracked(ForgeRegistries.BLOCKS.getValue(id))) toRemove.add(new LongObjectImmutablePair<>(chunkKey, id));
+                        if (!Trackable.isTracked(BuiltInRegistries.BLOCK.get(id))) toRemove.add(new LongObjectImmutablePair<>(chunkKey, id));
                     }
                 });
                 for (LongObjectPair<ResourceLocation> entry : toRemove) {
@@ -118,6 +120,8 @@ public class BlockTracker extends SavedData {
             }
         }
     }
+
+
     public static BlockTracker load(CompoundTag nbt) {
         BlockTracker data = new BlockTracker();
         Korall.LOGGER.info("Loading tracked block data...");
@@ -176,7 +180,7 @@ public class BlockTracker extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag nbt) {
+    public CompoundTag save(CompoundTag nbt, HolderLookup.Provider registries) {
         Korall.LOGGER.info("Saving tracked block data...");
         int totalDimensions = 0;
         int totalChunks = 0;
@@ -217,9 +221,13 @@ public class BlockTracker extends SavedData {
         return nbt;
     }
 
+    private static Factory<BlockTracker> factory() {
+        return new Factory<>(BlockTracker::new, (nbt, provider) -> load(nbt), DataFixTypes.CHUNK);
+    }
+
     public static BlockTracker get(ServerLevel level) {
         try {
-            return level.getDataStorage().computeIfAbsent(BlockTracker::load, BlockTracker::new, DATA_NAME);
+            return level.getDataStorage().computeIfAbsent(factory(), DATA_NAME);
         } catch (Exception e) {
             Korall.LOGGER.error("Failed to get BlockTracker for level {}", level.dimension().location());
             Korall.LOGGER.error("", e);

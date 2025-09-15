@@ -11,11 +11,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.UnmodifiableView;
 
@@ -58,7 +58,7 @@ public class EntityTracker {
     }
 
     public static void register() {
-        IEventBus bus = MinecraftForge.EVENT_BUS;
+        IEventBus bus = NeoForge.EVENT_BUS;
         bus.addListener(EntityTracker::onJoin);
         bus.addListener(EntityTracker::onLeave);
         bus.addListener(EntityTracker::onUpdatePre);
@@ -75,7 +75,6 @@ public class EntityTracker {
     }
 
     private static void onLeave(@NotNull EntityLeaveLevelEvent event) {
-        if (event.isCanceled()) return;
         Entity entity = event.getEntity();
         if (event.getLevel() instanceof ServerLevel level) {
             removeEntity(entity, level);
@@ -96,12 +95,10 @@ public class EntityTracker {
         }
     }
 
-    private static void onTick(TickEvent.@NotNull ServerTickEvent event) {
-        if (event.phase.equals(TickEvent.Phase.START)) {
-            event.getServer().execute(() -> {
-                Runnable task;
-                while ((task = EntityTracker.TASKS.poll()) != null) task.run();
-            });
-        }
+    private static void onTick(ServerTickEvent.Pre event) {
+        event.getServer().execute(() -> {
+            Runnable task;
+            while ((task = EntityTracker.TASKS.poll()) != null) task.run();
+        });
     }
 }
