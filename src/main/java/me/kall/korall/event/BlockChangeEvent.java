@@ -48,6 +48,7 @@ public class BlockChangeEvent extends BlockEvent {
         REMOVE, ADD, REPLACE
     }
 
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     public static final class PoiChange extends BlockChangeEvent {
         private final Optional<Holder<PoiType>> oldPoi, newPoi;
 

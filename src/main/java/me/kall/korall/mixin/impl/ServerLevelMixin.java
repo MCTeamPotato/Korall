@@ -1,4 +1,4 @@
-package me.kall.korall.mixin;
+package me.kall.korall.mixin.impl;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -31,6 +31,7 @@ public abstract class ServerLevelMixin {
         original.call(pos, oldState, newState);
     }
 
+    @SuppressWarnings({"OptionalUsedAsFieldOrParameterType", "LocalMayBeArgsOnly"})
     @Inject(method = "onBlockStateChange", at = @At(value = "INVOKE", target = "Ljava/util/Objects;equals(Ljava/lang/Object;Ljava/lang/Object;)Z", remap = false, shift = At.Shift.AFTER))
     private void poiChange(BlockPos pos, BlockState oldState, BlockState newState, CallbackInfo ci, @Local(ordinal = 0) Optional<Holder<PoiType>> oldPoi, @Local(ordinal = 1) Optional<Holder<PoiType>> newPoi) {
         MinecraftForge.EVENT_BUS.post(new BlockChangeEvent.PoiChange(pos, (ServerLevel) (Object) this, oldState, newState, this.getServer().isSameThread(), oldPoi, newPoi));

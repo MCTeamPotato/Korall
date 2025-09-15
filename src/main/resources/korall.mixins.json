@@ -10,12 +10,12 @@
   "client": [
   ],
   "mixins": [
-    "BlockMixin",
-    "EnchantedBookItemMixin",
-    "EntityMixin",
-    "EntityTypeMixin",
-    "ItemStackMixin",
-    "ServerLevelMixin"
+    "impl.BlockMixin",
+    "impl.EnchantedBookItemMixin",
+    "impl.EntityMixin",
+    "impl.EntityTypeMixin",
+    "impl.ItemStackMixin",
+    "impl.ServerLevelMixin"
   ],
   "injectors": {
     "defaultRequire": 1

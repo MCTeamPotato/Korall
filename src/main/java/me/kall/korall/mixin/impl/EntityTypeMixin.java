@@ -1,4 +1,4 @@
-package me.kall.korall.mixin;
+package me.kall.korall.mixin.impl;
 
 import me.kall.korall.api.Registry;
 import net.minecraft.resources.ResourceLocation;

@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import me.kall.korall.event.EntityChunkChangeEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -60,6 +61,8 @@ public class EntityTracker {
         IEventBus bus = MinecraftForge.EVENT_BUS;
         bus.addListener(EntityTracker::onJoin);
         bus.addListener(EntityTracker::onLeave);
+        bus.addListener(EntityTracker::onUpdatePre);
+        bus.addListener(EntityTracker::onUpdatePost);
         bus.addListener(EntityTracker::onTick);
     }
 
@@ -76,6 +79,20 @@ public class EntityTracker {
         Entity entity = event.getEntity();
         if (event.getLevel() instanceof ServerLevel level) {
             removeEntity(entity, level);
+        }
+    }
+
+    private static void onUpdatePre(EntityChunkChangeEvent.@NotNull Pre event) {
+        Entity entity = event.getEntity();
+        if (entity.level() instanceof ServerLevel level) {
+            removeEntity(entity, level);
+        }
+    }
+
+    private static void onUpdatePost(EntityChunkChangeEvent.@NotNull Post event) {
+        Entity entity = event.getEntity();
+        if (entity.level() instanceof ServerLevel level) {
+            addEntity(entity, level);
         }
     }
 

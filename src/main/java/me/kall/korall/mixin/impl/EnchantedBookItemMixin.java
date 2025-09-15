@@ -1,4 +1,4 @@
-package me.kall.korall.mixin;
+package me.kall.korall.mixin.impl;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;

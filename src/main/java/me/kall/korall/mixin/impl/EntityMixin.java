@@ -1,8 +1,8 @@
-package me.kall.korall.mixin;
+package me.kall.korall.mixin.impl;
 
-import me.kall.korall.data.EntityTracker;
-import net.minecraft.server.level.ServerLevel;
+import me.kall.korall.event.EntityChunkChangeEvent;
 import net.minecraft.world.entity.Entity;
+import net.minecraftforge.common.MinecraftForge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -12,17 +12,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class EntityMixin {
     @Inject(method = "setPosRaw", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/ChunkPos;<init>(Lnet/minecraft/core/BlockPos;)V"))
     private void beforeChunkPosUpdate(CallbackInfo ci) {
-        Entity self = (Entity) (Object) this;
-        if (self.level() instanceof ServerLevel serverLevel) {
-            EntityTracker.removeEntity(self, serverLevel);
-        }
+        MinecraftForge.EVENT_BUS.post(new EntityChunkChangeEvent.Pre((Entity) (Object) this));
     }
 
     @Inject(method = "setPosRaw", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/ChunkPos;<init>(Lnet/minecraft/core/BlockPos;)V", shift = At.Shift.AFTER))
     private void afterChunkPosUpdate(CallbackInfo ci) {
-        Entity self = (Entity) (Object) this;
-        if (self.level() instanceof ServerLevel serverLevel) {
-            EntityTracker.addEntity(self, serverLevel);
-        }
+        MinecraftForge.EVENT_BUS.post(new EntityChunkChangeEvent.Post((Entity) (Object) this));
     }
 }
